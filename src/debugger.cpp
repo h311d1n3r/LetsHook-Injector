@@ -58,18 +58,14 @@ void Debugger::pipeLoop() {
         while (pipe->readData(msg) <= 0) Sleep(100);
         if (msg) {
             if (msg[0] == BREAKPOINT) {
-                if (pipe->readData(msg) == sizeof(char)) {
-                    char replacedChar = msg[0];
-                    if (pipe->readData(msg) == sizeof(DWORDLONG)) {
-                        DWORDLONG addr = 0;
-                        memcpy(&addr, msg, sizeof(DWORDLONG));
-                        this->replacedCharsByAddr[addr] = replacedChar;
-                        int nameLen = pipe->readData(msg);
-                        string name = string((const char*)msg, nameLen);
-                        this->namesByAddr[addr] = name;
-                        const char breakpointArr[] = { BREAKPOINT };
-                        pipe->sendData((char*)breakpointArr, sizeof(breakpointArr));
-                    }
+                if (pipe->readData(msg) == sizeof(DWORDLONG)) {
+                    DWORDLONG addr = 0;
+                    memcpy(&addr, msg, sizeof(DWORDLONG));
+                    int nameLen = pipe->readData(msg);
+                    string name = string((const char*)msg, nameLen);
+                    this->namesByAddr[addr] = name;
+                    const char breakpointArr[] = { BREAKPOINT };
+                    pipe->sendData((char*)breakpointArr, sizeof(breakpointArr));
                 }
             }
             else if (msg[0] == START_DEBUGGER) this->startDebugger();
@@ -149,7 +145,7 @@ BOOL Debugger::setPrivilege(HANDLE hToken, LPCTSTR lpszPrivilege, BOOL bEnablePr
 }
 
 void Debugger::startDebugger() {
-    if (this->replacedCharsByAddr.size() == 0) return;
+    if (this->namesByAddr.size() == 0) return;
     HANDLE pToken;
     if (OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &pToken)) {
         this->setPrivilege(pToken, SE_DEBUG_NAME, TRUE);
@@ -158,8 +154,11 @@ void Debugger::startDebugger() {
     HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, false, pid);
     DebugActiveProcess(pid);
     DebugSetProcessKillOnExit(FALSE);
-    for (const auto& addr_pair : this->replacedCharsByAddr) {
+    for (const auto& addr_pair : this->namesByAddr) {
         DWORDLONG addr = addr_pair.first;
+        char replacedChar;
+        ReadProcessMemory(process, (LPVOID)addr, &replacedChar, sizeof(replacedChar), NULL);
+        this->replacedCharsByAddr[addr] = replacedChar;
         const char breakpoint = 0xCC; //int3
         WriteProcessMemory(process, (LPVOID)addr, &breakpoint, sizeof(breakpoint), NULL);
     }
