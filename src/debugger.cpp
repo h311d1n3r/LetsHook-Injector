@@ -65,13 +65,10 @@ void Debugger::pipeLoop() {
                         memcpy(&addr, msg, sizeof(DWORDLONG));
                         this->replacedCharsByAddr[addr] = replacedChar;
                         int nameLen = pipe->readData(msg);
-                        char* name = (char*) malloc(nameLen);
-                        if(name) {
-                            memcpy(name, msg, nameLen);
-                            this->namesByAddr[addr] = name;
-                            const char breakpointArr[] = { BREAKPOINT };
-                            pipe->sendData((char*)breakpointArr, sizeof(breakpointArr));
-                        }
+                        string name = string((const char*)msg, nameLen);
+                        this->namesByAddr[addr] = name;
+                        const char breakpointArr[] = { BREAKPOINT };
+                        pipe->sendData((char*)breakpointArr, sizeof(breakpointArr));
                     }
                 }
             }
