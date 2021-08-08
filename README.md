@@ -1,2 +1,2 @@
 # LetsHookInjector
- Injector designed for the LetsHook library
+ An injector designed for the LetsHook library
