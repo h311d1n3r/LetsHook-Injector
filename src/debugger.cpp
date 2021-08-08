@@ -64,6 +64,10 @@ void Debugger::pipeLoop() {
                     int nameLen = pipe->readData(msg);
                     string name = string((const char*)msg, nameLen);
                     this->namesByAddr[addr] = name;
+                    if (pipe->readData(msg) == sizeof(bool)) {
+                        bool keepBp = msg[0];
+                        this->keepBpByAddr[addr] = keepBp;
+                    }
                     const char breakpointArr[] = { BREAKPOINT };
                     pipe->sendData((char*)breakpointArr, sizeof(breakpointArr));
                 }
@@ -183,19 +187,30 @@ void Debugger::startDebugger() {
                             ctx.Dr0 = ctx.Dr6 = ctx.Dr7 = 0;
                             ctx.EFlags |= (1 << 8);
                             sendBreakpointResult(this->namesByAddr[(DWORDLONG)record.ExceptionAddress], ctx);
-                            this->replacedCharsByAddr.erase((DWORDLONG)record.ExceptionAddress);
                             SetThreadContext(thread, &ctx);
+                            this->lastBpAddr = (DWORDLONG)record.ExceptionAddress;
                             ResumeThread(thread);
-                            this->replacedCharsByAddr.erase((DWORDLONG)record.ExceptionAddress);
-                            this->namesByAddr.erase((DWORDLONG)record.ExceptionAddress);
-                            if (this->replacedCharsByAddr.size() == 0) stop = true;
+                            if (!this->keepBpByAddr[(DWORDLONG)record.ExceptionAddress]) {
+                                this->replacedCharsByAddr.erase((DWORDLONG)record.ExceptionAddress);
+                                this->namesByAddr.erase((DWORDLONG)record.ExceptionAddress);
+                                this->keepBpByAddr.erase((DWORDLONG)record.ExceptionAddress);
+                                if (this->replacedCharsByAddr.size() == 0) stop = true;
+                            }
                         }
                     }
                 }
-                else if (stop && record.ExceptionCode == EXCEPTION_SINGLE_STEP) {
-                    ContinueDebugEvent(debugEvent.dwProcessId, debugEvent.dwThreadId, dwContinueStatus);
-                    DebugActiveProcessStop(pid);
-                    break;
+                else if (record.ExceptionCode == EXCEPTION_SINGLE_STEP) {
+                    if(stop) {
+                        ContinueDebugEvent(debugEvent.dwProcessId, debugEvent.dwThreadId, dwContinueStatus);
+                        DebugActiveProcessStop(pid);
+                        break;
+                    }
+                    else if (this->lastBpAddr && this->keepBpByAddr.find(this->lastBpAddr) != this->keepBpByAddr.end()) {
+                        if(this->keepBpByAddr[this->lastBpAddr]) {
+                            const char breakpoint = 0xCC; //int3
+                            WriteProcessMemory(process, (LPVOID)this->lastBpAddr, &breakpoint, sizeof(breakpoint), NULL);
+                        }
+                    }
                 }
             }
             ContinueDebugEvent(debugEvent.dwProcessId, debugEvent.dwThreadId, dwContinueStatus);
@@ -203,6 +218,7 @@ void Debugger::startDebugger() {
         else {
             this->replacedCharsByAddr.clear();
             this->namesByAddr.clear();
+            this->keepBpByAddr.clear();
             DebugActiveProcessStop(pid);
             break;
         }

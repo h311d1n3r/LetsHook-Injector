@@ -12,6 +12,8 @@ private:
 	DWORD pid = 0;
 	std::map<DWORDLONG, char> replacedCharsByAddr;
 	std::map<DWORDLONG, std::string> namesByAddr;
+	std::map<DWORDLONG, bool> keepBpByAddr;
+	DWORDLONG lastBpAddr = 0;
 	PipeServer* pipe = NULL;
 	bool initPipeServer();
 	void startDebugger();
