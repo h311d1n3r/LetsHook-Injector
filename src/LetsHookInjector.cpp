@@ -3,14 +3,13 @@
 #include <string>
 #include <libloaderapi.h>
 #include <filesystem>
-#include <debugger.h>
 #pragma warning( disable : 6031) //disable getchar() warning
 
 using namespace std;
 
-const string VERSION = "1.1";
+const string VERSION = "1.2";
 const string AUTHOR = "h311d1n3r";
-const string REQUIRED_LIBS[] = {"LetsHook.dll"};
+const string REQUIRED_LIBS[] = {"asmjit.dll", "LetsHook.dll"};
 const string LIBS_PATH = "./libs/";
 
 HANDLE openProcess(int pid) {
@@ -44,11 +43,13 @@ bool injectDLL(HANDLE process, string lib_path) {
     if (!filesystem::exists(lib_path) || !thread) {
         SetConsoleTextAttribute(hConsole, 12);
         cout << "Unable to inject DLL..." << endl;
+        return false;
     }
     else {
         SetConsoleTextAttribute(hConsole, 10);
         cout << "DLL successfully injected !" << endl;
     }
+    return true;
 }
 
 int main() {
@@ -107,7 +108,6 @@ int main() {
     }
     SetConsoleTextAttribute(hConsole, 10);
     cout << "All libraries were successfully injected !" << endl;
-    Debugger debugger(pid);
     getchar();
     return 0;
 }
